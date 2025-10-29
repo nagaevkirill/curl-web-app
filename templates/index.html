@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>curl-web</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    textarea { width: 100%; min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { background: #0b1020; color: #e5e5e5; padding: 12px; overflow:auto; border-radius: 8px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn { padding: 10px 16px; border: 0; border-radius: 8px; cursor: pointer; background: #1f6feb; color: white; }
+    .btn:disabled { opacity: .6; cursor: default; }
+    .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-top: 16px; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+    .kvs { width: 100%; }
+    .kvs input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
+    .kvs td { padding: 4px; }
+    details { margin-top: 8px; }
+    .pill { display:inline-block; padding: 2px 8px; background:#eef2ff; border-radius: 999px; font-size: 12px; color:#1d4ed8; }
+  </style>
+</head>
+<body>
+  <h1>curl-web</h1>
+  <p class="muted">Вставь команду <code>curl</code> (безопасный парсер → <code>requests</code>). Примеры:</p>
+  <pre>curl -X POST https://httpbin.org/post -H "X-Demo: 1" --json '{"hello":"world"}'
+curl https://httpbin.org/get
+curl -I https://example.com
+curl -k --max-time 5 https://self-signed.badssl.com/</pre>
+
+  <textarea id="curl" placeholder='curl https://httpbin.org/get'></textarea>
+  <div class="row" style="margin-top:10px;">
+    <button id="run" class="btn">Выполнить</button>
+    <span id="status" class="muted"></span>
+  </div>
+
+  <div id="out"></div>
+
+  <script>
+    const btn = document.getElementById('run');
+    const ta = document.getElementById('curl');
+    const out = document.getElementById('out');
+    const statusEl = document.getElementById('status');
+
+    function pretty(obj){ return JSON.stringify(obj, null, 2); }
+
+    btn.onclick = async () => {
+      btn.disabled = true; statusEl.textContent = 'Выполняю...'; out.innerHTML = '';
+      try {
+        const res = await fetch('/run', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ curl: ta.value })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          out.innerHTML = `<div class="card"><b>Ошибка</b><pre>${pretty(data)}</pre></div>`;
+        } else {
+          const req = data.request || {};
+          const resp = data.response || {};
+          const hdrsReq = pretty(req.headers || {});
+          const hdrsResp = pretty(resp.headers || {});
+          const meta = [
+            `<span class="pill">${resp.status} ${resp.reason || ''}</span>`,
+            `<span class="muted">URL:</span> ${resp.url || ''}`,
+            `<span class="muted">Время:</span> ${resp.elapsed_ms} ms`,
+            `<span class="muted">Размер:</span> ${resp.size_bytes} bytes`,
+          ].join(' &nbsp;•&nbsp; ');
+
+          out.innerHTML = `
+            <div class="card">
+              <div>${meta}</div>
+              <details open><summary>Заголовки ответа</summary><pre>${hdrsResp}</pre></details>
+              <details><summary>Запрос (что ушло)</summary><pre>${pretty({method:req.method, url:req.url, headers:req.headers, has_body:req.has_body})}</pre></details>
+              <div style="margin-top:8px;"><b>Тело ответа</b></div>
+              <pre>${(resp.body || '').replaceAll('<','&lt;')}</pre>
+            </div>
+          `;
+        }
+      } catch (e) {
+        out.innerHTML = `<div class="card"><b>Ошибка JS</b><pre>${e}</pre></div>`;
+      } finally {
+        btn.disabled = false; statusEl.textContent = '';
+      }
+    };
+  </script>
+</body>
+</html>
