@@ -1,8 +1,24 @@
 version: "3.9"
+
 services:
-  curl-web:
+  tools-curl-web-app:
     build: .
-    container_name: curl-web
+    container_name: tools-curl-web-app
     restart: unless-stopped
-    ports:
-      - "7700:7700"
+    networks:
+      - traefik_default
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.curl-web.rule=Host(`curl.tools.crlvlrc.ru`)"
+      - "traefik.http.routers.curl-web.entrypoints=websecure"
+      - "traefik.http.routers.curl-web.tls=true"
+      - "traefik.http.routers.curl-web.tls.certresolver=lets-encrypt"
+
+      # Service (внутренний порт контейнера)
+      - "traefik.http.services.curl-web.loadbalancer.server.port=7700"
+
+
+networks:
+  traefik_default:
+    external: true
